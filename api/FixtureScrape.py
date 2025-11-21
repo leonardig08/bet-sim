@@ -8,27 +8,40 @@ from pprint import pprint
 import os
 
 
+
 leagues = ["Serie A", "Serie B", "Champions League",
            "Europa League", "Conference League", "Premier League",
-           "Bundesliga", "La Liga", "Ligue 1"]
+           "Bundesliga", "La Liga", "Ligue 1", "World Cup Qualifiers"]
 
 
-def fuzzy_match(name, choices, threshold=45):
+def fuzzy_match(name, choices, threshold=2):
+
+    if name == "Northern Ireland":
+        return "N.Ireland"
+
     match, score, _ = process.extractOne(name, choices, scorer=fuzz.token_set_ratio)
     #print(f"SCELTO {match} corrispondente a {name} con affidabilità {score}%")
-    if "Sud" in name:
+    if name == "Parma Calcio":
         print(f"SCELTO {match} corrispondente a {name} con affidabilità {score}%")
-    if name == "Premier League":
-        print(choices)
+        print(f"SCELTE DISPONIBILI:\n{choices}")
+
     if score >= threshold:
         return match
     return None
 
 
-def fuzzy_league_match(league_name, jsondata, key_hint=None, threshold=80):
+def fuzzy_league_match(league_name, jsondata, key_hint=None, threshold=50):
     if key_hint:
         # 1. Trova tutte le leghe con lo stesso name
+        print(league_name.lower())
         candidates = [comp for comp in jsondata if comp["name"].lower() == league_name.lower()]
+        candidatesalt = [comp for comp in jsondata if league_name.lower() in comp["name"].lower()  ]
+        if not candidates:
+            candidates = candidatesalt
+        print(candidates)
+        print(key_hint)
+
+
 
         # 2. Se esiste un hint nel key, filtriamo
         if key_hint:
@@ -60,7 +73,7 @@ def fuzzy_league_match(league_name, jsondata, key_hint=None, threshold=80):
 def saveMap(league):
     if type(league) == str:
         idmap = None
-        with open("idmap.json", "r", encoding="utf-8") as f:
+        with open("api/idmap.json", "r", encoding="utf-8") as f:
             idmap = json.loads(f.read())
         if idmap:
             url = f"https://www.thesportsdb.com/season/{idmap[league]}/2025-2026?csv=1&all=1"
@@ -73,9 +86,9 @@ def saveMap(league):
                 datacsv = soup.find(name="textarea",attrs={
                     "id": "myInput"
                 })
-                with open("testleague.csv", "w", encoding="utf-8") as f:
+                with open("api/testleague.csv", "w", encoding="utf-8") as f:
                     f.write(datacsv.get_text())
-                csvdata = pd.read_csv("testleague.csv")
+                csvdata = pd.read_csv("api/testleague.csv")
                 with open("mega.json","r",encoding="utf-8") as f:
                     jsondata = json.loads(f.read())
 
@@ -83,7 +96,7 @@ def saveMap(league):
                 compselect = None
 
 
-                with open("keyhints.json","r",encoding="utf-8") as f:
+                with open("api/keyhints.json","r",encoding="utf-8") as f:
                     hints = json.loads(f.read())
                 if league in hints.keys():
                     keyhint = hints[league]
@@ -91,6 +104,7 @@ def saveMap(league):
                     keyhint = None
 
                 matched = fuzzy_league_match(league, jsondata, keyhint)
+                print(league, keyhint)
                 print(matched)
 
                 for comp in jsondata:
@@ -99,7 +113,7 @@ def saveMap(league):
                     if comp["key"] == matched:
                         compselect = comp["events"]
                 if not compselect:
-                    print("ERROR")
+                    print("ERROR ",compselect)
                     return
 
                 teamstotal = {}
@@ -160,13 +174,16 @@ def getCsv(league): # cartella dello script
 
     return pd.read_csv(cache_file)
 
+def create_map():
+    from api.OddApiNew import BetAPI
+    bet = BetAPI()
 
-if __name__ == '__main__':
+    bet.get_fixture()
     totalassociate = {}
     for l in leagues:
         fix = saveMap(l)
-        #pprint(fix)
+        # pprint(fix)
         totalassociate[l] = fix
 
-    with open(f"map.json", "w", encoding="utf-8") as f:
+    with open(f"api/map.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(totalassociate, indent=4))

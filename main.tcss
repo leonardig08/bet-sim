@@ -30,6 +30,7 @@ GameObject{
 }
 #labelData{
     margin-top: 1;
+    width: 100;
 }
 VerticalGroup{
     width: auto
@@ -71,7 +72,7 @@ TabbedContent {
 #groupGameDetail{
     align:left middle;
     height:100%;
-    width: 29
+    width: 25w
 }
 #labelTitoletto {
     align: center middle;
@@ -189,4 +190,34 @@ MainAppScreen #balanceLab{
 }
 MainAppScreen #payoutLabel{
     margin-left: 2;
+}
+
+MainAppScreen #settingGroup{
+    align: left top;
+    height: 3fr;
+}
+MainAppScreen #settingGroup2{
+    align: left top;
+    height: 3fr;
+}
+
+MainAppScreen #mainSetting{
+    align: left top;
+    height: 3fr;
+    padding: 2;
+    border: round green;
+    margin: 1;
+    width: 1fr
+}
+
+MainAppScreen #versionLabel{
+    margin-left: 3;
+    margin-bottom: 1;
+    border: round blue;
+    width: 16;
+    content-align: center middle
+}
+#openModalAbout{
+    align: center middle;
+    margin-right: 4
 }
