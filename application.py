@@ -1,4 +1,4 @@
-VERSION = "2.3.0 PROD RELEASE"
+VERSION = "2.4.0 PROD RELEASE"
 
 
 import os
@@ -15,8 +15,8 @@ from textual.widgets import Header, Label, Rule, LoadingIndicator, TabbedContent
     Input, Markdown
 from textual.screen import Screen, ModalScreen
 from textual.widget import Widget
-from asset import stringText, cssText
-from textual import work, log
+from asset import stringText
+from textual import work
 from dataclasses import dataclass, asdict
 from textual.reactive import reactive
 import pandas as pd
@@ -27,19 +27,22 @@ import textual.theme
 
 scraper = None#
 
-betTypes = ["1x2", "Under/Over", "Entrambi Segnano"]
+betTypes = ["1x2", "Under/Over", "Entrambi Segnano", "Doppia Chance"]
 
 mapNames = None
 
 associate = {
-                            "1": 0,
-                            "x": 1,
-                            "2": 2,
-                            "Under": 0,
-                            "Over": 1,
-                            "Si": 0,
-                            "No": 1
-                        }
+    "1": 0,
+    "x": 1,
+    "2": 2,
+    "Under": 0,
+    "Over": 1,
+    "Si": 0,
+    "No": 1,
+    "1x": 0,
+    "12": 1,
+    "x2": 2
+}
 
 import unicodedata
 import re
@@ -177,6 +180,25 @@ class GameObject(Widget):
                             index += 1
                         if self.prepress is not None:
                             btts[self.prepress].variant = "success"
+            case 4:
+                with HorizontalGroup():
+                    with VerticalGroup(id="groupGameDetail"):
+                        yield Label(f"{self.game.home} - {self.game.away}")
+                        yield Label(f"{date_formatString(self.game.date)}", id="labelData")
+                    with HorizontalGroup(id="oddGroup"):
+                        index = 0
+                        btts = []
+                        for i in ["1x", "12", "x2"]:
+                            with VerticalGroup(id=f"odd{i}"):
+                                yield Label(i.upper(), id="labelUnit")
+                                yield Rule(line_style="solid", id="ruleUnit")
+                                btts.append(Button(str(self.game.odds[index]), "primary",
+                                                   name=f"{self.game.home.replace("/", "")}/{self.game.away.replace("/", "")}/{i}"))
+                                yield btts[index]
+                            index += 1
+                        if self.prepress is not None:
+                            btts[self.prepress].variant = "success"
+
 
                     
     def placeHolder(self):
@@ -252,6 +274,22 @@ class TicketObject(Widget):
                             if score[0] == 0 or score[1] == 0:
                                 wonBet = True
                             else: wonBet = False
+                        case "1x":
+                            if score[0] > score[1] or score[0] == score[1]:
+                                wonBet = True
+                            else:
+                                wonBet = False
+                        case "12":
+                            if score[0] > score[1] or score[0] < score[1]:
+                                wonBet = True
+                            else:
+                                wonBet = False
+                        case "x2":
+                            if score[0] == score[1] or score[0] < score[1]:
+                                wonBet = True
+                            else:
+                                wonBet = False
+
 
                 match wonBet:
                     case True:
@@ -337,6 +375,7 @@ class MainAppScreen(Screen):
     balance = reactive(0)
     moneyloaded = False
     betpay = reactive("?")
+    boughtResetFlag = False
     def __init__(self):
         super().__init__(id="MainAppScreen")
         self.odd_cache = {}
@@ -401,9 +440,9 @@ class MainAppScreen(Screen):
                         themesRaw = textual.theme.BUILTIN_THEMES
                         themesAvailable = []
                         for i in themesRaw.keys():
-                            themesAvailable.append((i.title(), i))
+                            themesAvailable.append((i, i))
 
-                        yield Select(themesAvailable, allow_blank=False, value="textual-dark", id="themeSelect")
+                        yield Select(themesAvailable, allow_blank=False, value=self.app.theme, id="themeSelect")
                 with HorizontalGroup(id="groupAbout"):
                     yield Label(VERSION, id = "versionLabel")
                     with Right():
@@ -486,10 +525,14 @@ class MainAppScreen(Screen):
             return
         else:
             print("Tab Activated ", nation, "--", self.old_nation)
-            if nation == self.old_nation:
+
+            if nation == self.old_nation and not self.boughtResetFlag:
                 return
             else:
                 self.old_nation = nation
+                self.old_bet = "1x2"
+                if self.boughtResetFlag:
+                    self.boughtResetFlag = False
             containerName = "games"+nation
             league = leaguesDict[containerName][0]
             self.update_games(league, containerName)
@@ -498,15 +541,20 @@ class MainAppScreen(Screen):
 
         if event.select.id == "themeSelect":
             self.app.theme = event.value
+            with open("theme.user", "w", encoding="utf-8") as f:
+                f.write(event.value)
             self.app.refresh()
             return
 
         if "bet" in event.select.id:
             betType = event.value
             if betType == self.old_bet:
+                print(f"EQUAL {betType} -- {self.old_bet}")
                 return
             else:
+                print(f"NOT EQUAL {betType} -- {self.old_bet}")
                 self.old_bet = betType
+
             id = event.select.id
             nation = id.removeprefix("bet")
             select = "select"+nation
@@ -524,6 +572,8 @@ class MainAppScreen(Screen):
                     betsel = 2
                 case "Entrambi Segnano":
                     betsel = 3
+                case "Doppia Chance":
+                    betsel = 4
             self.query_one(f"#{container}").set_loading(True)
             self.update_games(league, container, betsel)
             self.query_one(f"#{container}").set_loading(False)
@@ -538,6 +588,8 @@ class MainAppScreen(Screen):
                 self.rejectIndex += 1
                 return
             print("Getting ", league)
+            self.old_bet = "1x2"
+            print("RESET "+self.old_bet)
             
             for key,value in leaguesDict.items():
                 if league in value:
@@ -559,6 +611,8 @@ class MainAppScreen(Screen):
                 keyleague = league + "uo"
             case 3:
                 keyleague = league + "gn"
+            case 4:
+                keyleague = league + "dc"
         if keyleague in self.odd_cache.keys():
             odds = self.odd_cache[keyleague]
         else:
@@ -572,6 +626,9 @@ class MainAppScreen(Screen):
                 case 3:
                     odds = scraper.get_golng(league)
                     self.odd_cache[league + "gn"] = odds
+                case 4:
+                    odds = scraper.get_double(league)
+                    self.odd_cache[league + "dc"] = odds
 
         await self.query_one(f"#{containerName}").remove_children()
         print(odds)
@@ -614,6 +671,17 @@ class MainAppScreen(Screen):
                         self.query_one(f"#{containerName}").mount(
                             GameObject(gameData, id=f"{sanitize_id(gameData.home)}_{sanitize_id(gameData.away)}_gn",
                                        typebet=3, prepress=odder))
+                    case 4:
+                        odder = None
+                        print(self.current_bet)
+                        if f"{gameData.home}{gameData.away}{gameData.date}dc" in self.current_bet:
+                            odder = ["1x", "12", "x2"].index(self.current_bet[
+                                                           f"{gameData.home}{gameData.away}{gameData.date}dc"][
+                                                           1])
+                        print(odder)
+                        self.query_one(f"#{containerName}").mount(
+                            GameObject(gameData, id=f"{sanitize_id(gameData.home)}_{sanitize_id(gameData.away)}_dc",
+                                       typebet=4, prepress=odder))
 
 
         self.query_one(f"#{containerName}").set_loading(False)
@@ -627,9 +695,11 @@ class MainAppScreen(Screen):
                 afterkey = "uo"
             case 3:
                 afterkey = "gn"
+            case 4:
+                afterkey = "dc"
 
         if f"{game.home}{game.away}{game.date}{afterkey}" in self.current_bet.keys():
-            if self.current_bet[f"{game.home}{game.away}{game.date}"][1] != odd:
+            if self.current_bet[f"{game.home}{game.away}{game.date}{afterkey}"][1] != odd:
                 self.current_bet[f"{game.home}{game.away}{game.date}{afterkey}"] = [game, odd]
                 for button in self.query_one(f"#{sanitize_id(game.home)}_{sanitize_id(game.away)}" if afterkey == "" else f"#{sanitize_id(game.home)}_{sanitize_id(game.away)}_{afterkey}").query("Button"):
                     button.variant = "primary"
@@ -757,6 +827,7 @@ class MainAppScreen(Screen):
                 print(send.status_code)
 
         self.current_bet = {}
+        self.boughtResetFlag = True
         self.reload_ticket()
         
 
@@ -810,6 +881,15 @@ class BetSim(App):
         self.push_screen(SplashScreen())
         self.odd_data = None
         self.dataLoaded = False
+
+        theme = "textual-dark"
+        try:
+            with open("theme.user", "r", encoding="utf-8") as f:
+                theme = f.read()
+        except FileNotFoundError:
+            with open("theme.user", "w", encoding="utf-8") as f:
+                f.write(theme)
+        self.theme = theme
         
         self.call_later(self.load_data)
 

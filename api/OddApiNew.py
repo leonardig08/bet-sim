@@ -73,6 +73,8 @@ class BetAPI:
 
         print(f"DB DB \n{self.db}")
         print(f"MAP MAP \n{self.nameMap}")
+        if self.nameMap[league] is None:
+            return []
         for event in events:
             if event["home"] is None:
                 continue
@@ -116,6 +118,8 @@ class BetAPI:
         gamebets = []
         print(f"DB DB \n{self.db}")
         print(f"MAP MAP \n{self.nameMap}")
+        if self.nameMap[league] is None:
+            return []
         for event in events:
 
             if event["home"] is None:
@@ -174,6 +178,8 @@ class BetAPI:
         gamebets = []
         print(f"DB DB \n{self.db}")
         print(f"MAP MAP \n{self.nameMap}")
+        if self.nameMap[league] is None:
+            return []
         for event in events:
             print(event)
 
@@ -213,7 +219,55 @@ class BetAPI:
             print(gameobj)
             gamebets.append(gameobj)
         return gamebets
+    def get_double(self, league):
+        if not self.canRequestBets:
+            return
+        leagueformat = leagueMap[league]
+        self.cache_db(league)
+        headers = {
+            "accept": "application/json",
+            "X-API-Key": "eyJhbGciOiJSUzI1NiIsImtpZCI6Img4LThRX1YwZnlUVHRPY2ZXUWFBNnV2bktjcnIyN1YzcURzQ2Z4bE44MGMiLCJ0eXAiOiJKV1QifQ.eyJhY2Nlc3NfdGllciI6ImFmZmlsaWF0ZSIsImV4cCI6MjA3ODMzNDc0NCwiaWF0IjoxNzYyOTc0NzQ0LCJqdGkiOiI1ZWIwNGZjNS0xMjhiLTRhNGEtOTMyNS03Nzk3M2IwYjFmOWQiLCJzdWIiOiIxN2U0ZDk4MS1jODA1LTRkZDMtYmVmYi01NzhjNTkwNWMwY2EiLCJ0ZW5hbnQiOiJjbG91ZGJldCIsInV1aWQiOiIxN2U0ZDk4MS1jODA1LTRkZDMtYmVmYi01NzhjNTkwNWMwY2EifQ.leilGTjGj7zcxFC9zmsUAsK0UAezmGw9aZZrdFHtqtmO821nm4jr7HmqBVgtKzUTPEGpj10JPZVAjf-yr-F83iVLHQrclei-V-q56gxww8GPDd2ns8TMtOfU7SmWgiRzAa7e3wbFwurN9OgmIX-wYo6WvvBPPEdHWi2JesIORGyC8JwIW4f3O8pCcnCOvts2cE9sjO_WoocX-rW9a11EtgfgYST_JvmcvcXoA-Wt7BB3wjOXHuleYY2jT1vwjvlNTQFKPcRdzls_z2EhkUE6BJmpqsfGdNfNje7pYp3zqBzW0Q_lFkZuUZ1j3s2d_RCShU5YzMBbvIJiB0ss4SwCtw"
+        }
+        url = self.urlBetBase + leagueformat + "?markets=soccer.double_chance"
+        response = requests.get(url, headers=headers)
+        print(response.status_code)
 
+        events = response.json()["events"]
+        gamebets = []
+
+        print(f"DB DB \n{self.db}")
+        print(f"MAP MAP \n{self.nameMap}")
+        if self.nameMap[league] is None:
+            return []
+        for event in events:
+            if event["home"] is None:
+                continue
+            gameondb = self.db[(self.db["Home Team"] == self.nameMap[league][event["home"]["name"]]) & (self.db["Away Team"] == self.nameMap[league][event["away"]["name"]])]
+            if gameondb.empty:
+                print("SKIPPING no match")
+                continue
+
+            if not "soccer.double_chance" in event["markets"].keys():
+                print("NO BOTH TEAMS")
+                continue
+            print(f"{self.db["Home Team"]} -- {self.nameMap[league][event["home"]["name"]]}\n{self.db["Away Team"]} -- {self.nameMap[league][event["away"]["name"]]}")
+            oddsraw = event["markets"]["soccer.double_chance"]["submarkets"]["period=ft"]["selections"]
+            order_double = ["home_draw", "home_away", "draw_away"]
+            print(oddsraw)
+            oddselab = sorted(
+                [o for o in oddsraw if o["outcome"].lower() in order_double],
+                key=lambda x: order_double.index(x["outcome"].lower())
+            )
+            print("ODD")
+            print(oddselab)
+
+
+
+
+            gameobj = Game(gameondb["dateEvent"].iloc[0], gameondb["Home Team"].iloc[0], gameondb["Away Team"].iloc[0], [oddo["price"] for oddo in oddselab], league)
+            print(gameobj)
+            gamebets.append(gameobj)
+        return gamebets
 
 
 

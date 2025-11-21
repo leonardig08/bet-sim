@@ -221,3 +221,32 @@ MainAppScreen #versionLabel{
     align: center middle;
     margin-right: 4
 }
+
+#odd1x{
+    margin-right: 1;
+    border: solid blue
+}
+#odd12{
+    margin-right:1;
+    border: solid blue
+}
+#oddx2{
+    border: solid blue
+}
+
+#oddOver{
+    margin-right: 1;
+    border: solid blue
+}
+#oddUnder{
+    margin-right:1;
+    border: solid blue
+}
+#oddSi{
+    margin-right:1;
+    border: solid blue
+}
+#oddNo{
+    margin-right:1;
+    border: solid blue
+}
