@@ -1,4 +1,4 @@
-VERSION = "2.3.0 DEV FEATURE 4"
+VERSION = "2.3.0 PROD RELEASE"
 
 
 import os
